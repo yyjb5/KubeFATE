@@ -132,6 +132,42 @@ generate_cluster_config() {
   sed -i '0,/grpcNodePort: 30092/s//grpcNodePort: 30102/' fate-10000.yaml
 }
 
+EXPECT_PYTHON_STATUS=' * Running on http://'
+
+check_fate_10000_fateflow_status() {
+  MAX_TRY=20
+  for ((i = 1; i <= MAX_TRY; i++)); do
+    echo "# containers are ok"
+    python_status=$(kubectl logs -n fate-10000 svc/fateflow -c python --tail 1 2>&1)
+    echo "${python_status}"
+    if [[ "${python_status}" =~ "${EXPECT_PYTHON_STATUS}" ]]; then
+      return 0
+    fi
+    echo "fate-10000 fateflow successfully started"
+    echo "# fate-9999 fateflow log: ${python_status} want ${EXPECT_PYTHON_STATUS}"
+    sleep 3
+  done
+
+  return 1
+}
+
+check_fate_9999_fateflow_status() {
+  MAX_TRY=20
+  for ((i = 1; i <= MAX_TRY; i++)); do
+    echo "# containers are ok"
+    python_status=$(kubectl logs -n fate-9999 svc/fateflow -c python --tail 1 2>&1)
+    echo "${python_status}"
+    if [[ "${python_status}" =~ "${EXPECT_PYTHON_STATUS}" ]]; then
+      echo "fate-9999 fateflow successfully started"
+      return 0
+    fi
+    echo "# fate-9999 fateflow log: ${python_status} want ${EXPECT_PYTHON_STATUS}"
+    sleep 3
+  done
+
+  return 1
+}
+
 main() {
   cd ${BASE_DIR}
 
@@ -182,31 +218,32 @@ main() {
     --selector=${selector_fate10000} \
     --timeout=180s
 
-  for ((i = 1; i <= $MAX_TRY; i++)); do
-    jobstatus=$(kubefate cluster ls | grep "fate")
-    if [[ $jobstatus == "Success" ]]; then
-      logsuccess "ClusterDelete job success"
-      return 0
-    fi
-    if [[ $jobstatus != "Pending" ]] && [[ $jobstatus != "Running" ]]; then
-      logerror "ClusterDelete job status error, status: $jobstatus"
-      kubefate job describe $jobUUID
-      return 1
-    fi
-    echo "[INFO] Current kubefate ClusterDelete job status: $jobstatus want Success"
-    sleep 3
-  done
+  check_fate_10000_fateflow_status
+
+  check_fate_9999_fateflow_status
 
   kubectl exec -n fate-9999 -it svc/fateflow -c python -- bash -c "source /data/projects/python/venv/bin/activate && \
   cd /data/projects/fate/examples/toy_example && \
   python run_toy_example.py 9999 9999 1"
 
+  if [[ $? -eq 0 ]]; then
+    loginfo "Unilateral test successful"
+  else
+    exit 1
+  fi
+
   kubectl exec -n fate-9999 -it svc/fateflow -c python -- bash -c "source /data/projects/python/venv/bin/activate && \
   cd /data/projects/fate/examples/toy_example && \
   python run_toy_example.py 9999 10000 1"
-
+  if [[ $? -eq 0 ]]; then
+    loginfo "Bilateral test successful"
+  else
+    exit 1
+  fi
   # delete fate
-  kubefate cluster ls | grep "fate" | awk '{print $1}' | xargs kubefate cluster delete
+  kubefate cluster ls | grep "fate" | awk '{print $1}' | xargs -n1 kubefate cluster delete
+
+  sleep 30s
 
   kubectl delete namespace fate-9999
   kubectl delete namespace fate-10000
