@@ -1,0 +1,51 @@
+name: Spark Docker Image CI
+on:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Build the Docker Spark image
+        working-directory: KubeFATE/docker-build/
+        run: |
+          docker version
+          # 使用Dockerfile构建镜像
+          
+          # spark
+          docker build --build-arg SOURCE_PREFIX=zssd --build-arg SOURCE_TAG=2.4.8 -t zssd/spark-base:2.4.8 spark/base
+          echo "Image: "zssd/spark-base:2.4.8" Build Successful"
+
+          docker build --build-arg SOURCE_PREFIX=zssd --build-arg SOURCE_TAG=2.4.8 -t zssd/spark-master:2.4.8 spark/master
+          echo "Image: "zssd/spark-master:2.4.8" Build Successful"
+          docker build --build-arg SOURCE_PREFIX=zssd --build-arg SOURCE_TAG=2.4.8 -t zssd/spark-worker:2.4.8 spark/worker
+          echo "Image: "zssd/spark-worker:2.4.8" Build Successful"
+    steps:
+      - uses: actions/checkout@v2
+      - name: Export the Docker Spark image
+        working-directory: ./
+        run:  |
+          docker save -o spark-base-2.4.8.tar zssd/spark-base:2.4.8
+          docker save -o spark-master-2.4.8.tar zssd/spark-master:2.4.8
+          docker save -o spark-worker-2.4.8.tar zssd/spark-worker:2.4.8
+      - name: spark-base out
+        # id: out_report
+        uses: actions/upload-artifact@v1
+        # if: failure()
+        with:
+          name: base-spark out
+          path: ./spark-base-2.4.8.tar
+      - name: spark-master out
+        # id: out_report
+        uses: actions/upload-artifact@v1
+        # if: failure()
+        with:
+          name: master-spark out
+          path: ./spark-master-2.4.8.tar
+      - name: spark-worker out
+        # id: out_report
+        uses: actions/upload-artifact@v1
+        # if: failure()
+        with:
+          name: worker-spark out
+          path: ./spark-worker-2.4.8.tar
