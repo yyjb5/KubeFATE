@@ -20,7 +20,6 @@ jobs:
           echo "Image: "zssd/spark-master:2.4.8" Build Successful"
           docker build --build-arg SOURCE_PREFIX=zssd --build-arg SOURCE_TAG=2.4.8 -t zssd/spark-worker:2.4.8 spark/worker
           echo "Image: "zssd/spark-worker:2.4.8" Build Successful"
-    steps:
       - uses: actions/checkout@v2
       - name: Export the Docker Spark image
         working-directory: ./
