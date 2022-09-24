@@ -1,4 +1,4 @@
-name: 1.8 Spark Docker Image CI
+name: Spark Docker Image CI for 1.8
 on:
   workflow_dispatch:
 jobs:
